@@ -1,7 +1,5 @@
 #include <iostream>
 #include <random>
-#include <iterator>
-#include <numeric>
 
 using namespace std;
 
@@ -72,7 +70,7 @@ VectorFloat initVectorFloat(int size)
 
 
 typedef struct VectorFloatSet {
-    VectorFloat **set;
+    VectorFloat *set;
     int *sizes;
     int size;
 } VectorFloatSet;
@@ -81,11 +79,11 @@ typedef struct VectorFloatSet {
 VectorFloatSet initVectorFloatSet(int *sizes, int size)
 {
     VectorFloatSet newVectorFloatSet;
-    newVectorFloatSet.set = (VectorFloat**)malloc(size * sizeof(VectorFloat*));
+    newVectorFloatSet.set = (VectorFloat*)malloc(size * sizeof(VectorFloat));
     for(int i=0; i<size; i++)
     {
         VectorFloat newVectorFloat = initVectorFloat(sizes[i]);
-        newVectorFloatSet.set[i] = &newVectorFloat;
+        newVectorFloatSet.set[i] = newVectorFloat;
     }
     newVectorFloatSet.sizes = sizes;
     newVectorFloatSet.size = size;
@@ -112,8 +110,9 @@ VectorInt initVectorInt(int size)
 
 
 typedef struct Network {
-    MatrixSet *weights; /* Set of matrices defining the network's weights */
-    VectorFloatSet *biases; /* Set of arrays defining the network's biases */
+    MatrixSet weights; /* Set of matrices defining the network's weights */
+    VectorFloatSet biases; /* Set of vectors defining the network's biases */
+    VectorFloatSet nodes;
     int *acti_funcs;
     int *sizes;
     int n_layers;
@@ -124,6 +123,13 @@ VectorFloatSet GenerateBiases(int *sizes, int n_layers)
 {
     VectorFloatSet biases = initVectorFloatSet(sizes, n_layers);
     return biases;
+}
+
+
+VectorFloatSet GenerateNodes(int *sizes, int n_layers)
+{
+    VectorFloatSet nodes = initVectorFloatSet(sizes, n_layers);
+    return nodes;
 }
 
 
@@ -156,17 +162,16 @@ void GenerateWeights(MatrixSet weights, int* sizes, int n_layers)
 }
 
 
-Network InitNetwork(int *acti_funcs, int *sizes)
-{
-    int size = sizeof(sizes) / sizeof(sizes[0]) - 1;
-
+Network InitNetwork(int *acti_funcs, int *sizes, int size)
+{ 
     Network network;
 
-    MatrixSet weights;
+    MatrixSet weights = initMatrixSet(sizes, size);
     GenerateWeights(weights, sizes, size);
-    network.weights = &weights;
+    network.weights = weights;
 
-    network.biases = &GenerateBiases(sizes, size);
+    network.biases = GenerateBiases(sizes, size);
+    network.nodes = GenerateNodes(sizes, size);
 
     network.acti_funcs = acti_funcs;
     network.sizes = sizes;
@@ -176,16 +181,49 @@ Network InitNetwork(int *acti_funcs, int *sizes)
 }
 
 
-/* Function to define the feed forward loop for the neural network based on the entry data and activation functions passed*/
-float *FeedForward(Network network, float *entry_data)
-    /* ADD actual code for the feed forward loop */
+void VectorByMatrix(VectorFloat vector, Matrix matrix, VectorFloat result)
+{   
+    for(int i=0; i<matrix.ncols; i++)
+    {
+        int c = 0;
+        for(int j=0; j<matrix.nrows; j++)
+        {
+            c += vector.v[j] * matrix.v[i][j];
+        }
+        result.v[i] = c;
+    }
+}
+
+
+/* Function to define the feed forward loop for the neural network based on the entry data */
+void FeedForward(Network network, float *entry_data)
 {
-    float values[2] = {10, 20};
-    return values;
+    for(int i=0; i<network.sizes[0]; i++)
+    {
+        network.nodes.set[0].v[i] = entry_data[i];
+    }
+    for(int i=0; i<network.n_layers; i++)
+    {
+        
+    }
 }
 
 
 int main()
-{
-    return 0;
+{   
+    int acti_funcs[2] = {1, 1};
+    int sizes[3] = {3, 5, 3};
+    int size = 2;
+
+    Network network = InitNetwork(acti_funcs, sizes, size);
+    Matrix matrix1 = *network.weights.set[0];
+    cout << "matriz 1" << endl;
+    for(int i=0; i<matrix1.nrows; i++)
+    {
+        for(int j=0; j<matrix1.ncols; j++)
+        {
+        int v = matrix1.v[i][j];
+        cout << v << " ";
+        }
+    }
 }
