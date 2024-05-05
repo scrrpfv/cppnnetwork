@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <random>
 
 using namespace std;
@@ -14,17 +15,17 @@ Matrix initMatrix(int nrows, int ncols) {
     Matrix newMatrix;
     
     newMatrix.v = (float**)malloc(nrows * sizeof(float*));
-    for (int i=0; i<nrows; i++) {
+    for (int i = 0; i < nrows; i++) {
         newMatrix.v[i] = (float*)malloc(ncols * sizeof(float));
     }
     newMatrix.nrows = nrows;
     newMatrix.ncols = ncols;
-    
+
     return newMatrix;
 }
 
 typedef struct MatrixSet {
-    Matrix **set;
+    Matrix *set;
     int *sizes;
     int size;
 } MatrixSet;
@@ -32,11 +33,11 @@ typedef struct MatrixSet {
 /* Initialzie empty set of matrices with defined sizes */
 MatrixSet initMatrixSet(int *sizes, int size) {
     MatrixSet newMatrixSet;
-    newMatrixSet.set = (Matrix**)malloc(size * sizeof(Matrix*));
+    newMatrixSet.set = (Matrix*)malloc(size * sizeof(Matrix));
 
-    for (int i=0; i<size; i++) {
+    for (int i = 0; i < size; i++) {
         Matrix newMatrix = initMatrix(sizes[i], sizes[i+1]);
-        newMatrixSet.set[i] = &newMatrix;
+        newMatrixSet.set[i] = newMatrix;
     }
     newMatrixSet.sizes = sizes;
     newMatrixSet.size = size;
@@ -67,7 +68,7 @@ typedef struct VectorFloatSet {
 VectorFloatSet initVectorFloatSet(int *sizes, int size) {
     VectorFloatSet newVectorFloatSet;
     newVectorFloatSet.set = (VectorFloat*)malloc(size * sizeof(VectorFloat));
-    for(int i=0; i<size; i++) {
+    for(int i = 0; i < size + 1; i++) {
         VectorFloat newVectorFloat = initVectorFloat(sizes[i]);
         newVectorFloatSet.set[i] = newVectorFloat;
     }
@@ -116,8 +117,8 @@ void GenerateLayer(Matrix layer, int n, int m) {
     normal_distribution<float> dis(0, 1);
     auto rand = [&](){ return dis(gen); }; /* Different function call for each value to ensure no repeats */
 
-    for (int i=0; i<n; i++) {
-        for (int j=0; j<m; j++) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
             layer.v[i][j] = rand(); /* Attributes random values to the layers */
         }
     }
@@ -126,7 +127,7 @@ void GenerateLayer(Matrix layer, int n, int m) {
 /* Function to initialize the weights of a network using the GenerateLayer function iteratively */
 void GenerateWeights(MatrixSet weights, int* sizes, int n_layers) {
     for(int i = 0; i<n_layers; i++) {
-        GenerateLayer(*weights.set[i], sizes[i], sizes[i + 1]);
+        GenerateLayer(weights.set[i], sizes[i], sizes[i + 1]);
     }
 }
 
@@ -147,39 +148,53 @@ Network InitNetwork(int *acti_funcs, int *sizes, int size) {
     return network;
 }
 
-void VectorByMatrix(VectorFloat vector, Matrix matrix, VectorFloat result) {   
-    for (int i=0; i<matrix.ncols; i++) {
-        int c = 0;
-        for (int j=0; j<matrix.nrows; j++) {
-            c += vector.v[j] * matrix.v[i][j];
+VectorFloat VectorByMatrix(VectorFloat vector, Matrix matrix, VectorFloat result) {
+    for (int i = 0; i < matrix.ncols; i++) {
+        float c = 0;
+        for (int j = 0; j < vector.size; j++) {
+            c += vector.v[j] * matrix.v[j][i];
         }
         result.v[i] = c;
     }
+    return result;
 }
 
 /* Function to define the feed forward loop for the neural network based on the entry data */
 void FeedForward(Network network, float *entry_data) {
-    for (int i=0; i<network.sizes[0]; i++) {
-        network.nodes.set[0].v[i] = entry_data[i];
+    for (int i = 0; i < network.sizes[0]; i++) {
+        network.nodes.set[0].v[i] = entry_data[i]; /* Set entry nodes to input values */
     }
-    for (int i=0; i<network.n_layers; i++)
+    for (int i = 0; i < network.n_layers; i++)
     {
-        
+        /* Pega os valores dos nodos anteriores, multiplica pelos pesos e coloca nos próximos nodos */
+        VectorByMatrix(network.nodes.set[i], network.weights.set[i], network.nodes.set[i + 1]);
     }
 }
 
 int main() {
+    cout << setprecision(4);
     int acti_funcs[2] = {1, 1};
     int sizes[3] = {3, 5, 3};
     int size = 2;
+    float entry[3] = {1, 2, 3};
 
     Network network = InitNetwork(acti_funcs, sizes, size);
-    Matrix matrix1 = *network.weights.set[0];
-    cout << "matriz 1" << endl;
-    for (int i=0; i<matrix1.nrows; i++) {
-        for (int j=0; j<matrix1.ncols; j++) {
-        int v = matrix1.v[i][j];
-        cout << v << " ";
+    for (int n = 0; n < network.n_layers; n++) {
+        Matrix matrix = network.weights.set[n];
+
+        for (int i = 0; i < matrix.nrows; i++) {
+            for (int j = 0; j < matrix.ncols; j++) {
+                cout << matrix.v[i][j] << " | ";
+            }
+            cout << endl;
         }
     }
+
+    FeedForward(network, entry);
+
+    cout << "Output: " << endl;
+    for (int i = 0; i < network.sizes[network.n_layers]; i++) {
+        cout << network.nodes.set[network.n_layers].v[i] << " ";
+    }
+    cout << endl;
 }
