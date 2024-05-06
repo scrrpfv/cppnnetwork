@@ -92,11 +92,15 @@ VectorInt initVectorInt(int size) {
     return newVectorInt;
 }
 
+typedef struct ActiFuncs {
+    float (**f)(float, float);
+} ActiFuncs;
+
 typedef struct Network {
     MatrixSet weights; /* Set of matrices defining the network's weights */
     VectorFloatSet biases; /* Set of vectors defining the network's biases */
     VectorFloatSet nodes;
-    int *acti_funcs;
+    ActiFuncs acti_funcs;
     int *sizes;
     int n_layers;
 } Network;
@@ -131,6 +135,32 @@ void GenerateWeights(MatrixSet weights, int* sizes, int n_layers) {
     }
 }
 
+float ReLu(float x, float bias) {
+    return (abs(x) + x)/2;
+}
+
+float Linear(float x, float bias) {
+    return x + bias;
+}
+
+ActiFuncs GenerateActiFuncs(int *acti_funcs, int size) {
+    ActiFuncs functions;
+    for (int i = 0; i < size; i++) {
+        switch (acti_funcs[i]) {
+        case 0:
+            functions.f[i] = Linear;
+            break;
+        case 1:
+            functions.f[i] = ReLu;
+            break;
+        default:
+            functions.f[i] = Linear;
+            break;
+        }
+    }
+    return functions;
+}
+
 Network InitNetwork(int *acti_funcs, int *sizes, int size) {
     Network network;
 
@@ -140,8 +170,8 @@ Network InitNetwork(int *acti_funcs, int *sizes, int size) {
 
     network.biases = GenerateBiases(sizes, size);
     network.nodes = GenerateNodes(sizes, size);
-
-    network.acti_funcs = acti_funcs;
+    
+    network.acti_funcs = GenerateActiFuncs(acti_funcs, size);
     network.sizes = sizes;
     network.n_layers = size;
     
@@ -161,19 +191,24 @@ VectorFloat VectorByMatrix(VectorFloat vector, Matrix matrix, VectorFloat result
 
 /* Function to define the feed forward loop for the neural network based on the entry data */
 void FeedForward(Network network, float *entry_data) {
+    VectorFloat *nodes = network.nodes.set;
     for (int i = 0; i < network.sizes[0]; i++) {
-        network.nodes.set[0].v[i] = entry_data[i]; /* Set entry nodes to input values */
+        nodes[0].v[i] = entry_data[i]; /* Set entry nodes to input values */
     }
     for (int i = 0; i < network.n_layers; i++)
     {
         /* Pega os valores dos nodos anteriores, multiplica pelos pesos e coloca nos próximos nodos */
-        VectorByMatrix(network.nodes.set[i], network.weights.set[i], network.nodes.set[i + 1]);
+        VectorByMatrix(nodes[i], network.weights.set[i], nodes[i + 1]);
+
+        for (int j = 0; j < nodes[i].size; j++) {
+            nodes[i].v[j] = network.acti_funcs.f[i](nodes[i].v[j], network.biases.set[i].v[j]);
+        }
     }
 }
 
 int main() {
     cout << setprecision(4);
-    int acti_funcs[2] = {1, 1};
+    int acti_funcs[2] = {0, 1};
     int sizes[3] = {3, 5, 3};
     int size = 2;
     float entry[3] = {1, 2, 3};
